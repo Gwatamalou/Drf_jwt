@@ -3,25 +3,18 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .serializers import UserSerializer
+from .serializers import LogoutSerializer, TokenRefreshSerializer, UserSerializer
 
 
 class UserRegisterAPIView(APIView):
     def post(self, request):
-        if not request.data.get("username") or not request.data.get("password"):
-            return Response({"error": "Wrong user name or password"})
         serializer = UserSerializer(data=request.data)
-        try:
-            serializer.is_valid()
+        if serializer.is_valid():
             user_data = serializer.save()
             return Response(user_data, status=status.HTTP_201_CREATED)
-        except AssertionError:
-            return Response(
-                {"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST
-            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LoginAPIView(TokenObtainPairView):
@@ -38,40 +31,18 @@ class LoginAPIView(TokenObtainPairView):
 
 class UpdateAccessTokenAPIView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
-        try:
-            refresh_token = request.data.get("refresh")
-            if not refresh_token:
-                return Response(
-                    {"error": "Refresh token is required"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            token = RefreshToken(refresh_token)
-            access_token = token.access_token
-
-            return Response({"access": str(access_token)}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = TokenRefreshSerializer(data=request.data)
+        if serializer.is_valid():
+            return Response(serializer.validated_data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LogoutAPIView(APIView):
     def post(self, request):
-        refresh_token = request.data.get("refresh")
-
-        if not refresh_token:
-            return Response(
-                {"error": "needed refresh token"}, status=status.HTTP_400_BAD_REQUEST
-            )
-        try:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-        except Exception:
-            return Response(
-                {"error": "Invalid or expired refresh token"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return Response({"success": "way out is successful"}, status=status.HTTP_200_OK)
+        serializer = LogoutSerializer(data=request.data)
+        if serializer.is_valid():
+            return Response(serializer.validated_data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProtectedAPIView(APIView):
